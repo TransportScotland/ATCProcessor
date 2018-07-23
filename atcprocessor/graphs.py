@@ -3,6 +3,13 @@ from matplotlib.patches import Patch
 import matplotlib.dates as mdates
 import pandas as pd
 
+from .version import __version__
+from .calmap import calmap
+
+VERSION_TEXT = '''
+Produced by Transport Scotland ATC Processor v{}
+'''.format(__version__)
+
 MONTH_LOCATOR = mdates.MonthLocator()
 MONTH_FORMATTER = mdates.DateFormatter('%b\n%Y')
 
@@ -60,3 +67,29 @@ def yearly_scatter(data, datetime_col, value_col, category_col, colour_col,
         # yield the figure so we can close the plot once it has been saved
         yield year, fig
         plt.close('all')
+
+
+def calendar_plot(data, count_column, maxval=None):
+    if maxval is None:
+        maxval = data[count_column].max()
+
+    fig, ax = calmap.calendarplot(
+        data[count_column], cmap='RdYlBu',
+        yearlabel_kws=dict(color='k', size='large'),
+        how=None, monthseparator=True, separatorwidth=1,
+        vmax=maxval, #fillcolor='white',
+        fig_kws=dict(figsize=(8, 8))
+    )
+
+    # Add colour bar and watermark.
+    cbar = fig.colorbar(ax[0].get_children()[1], ax=ax.ravel().tolist(),
+                        pad=0.1)
+    cbar.ax.set_ylabel('Total traffic (vehs)')
+
+    cbar.ax.text(-0.2, 0.5, VERSION_TEXT,
+                 rotation=90, alpha=0.5,
+                 va='center', ha='center',
+                 size='xx-small')
+
+    yield fig, ax
+    plt.close('all')
