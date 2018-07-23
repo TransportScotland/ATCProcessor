@@ -103,6 +103,13 @@ class CountSite:
                 'The following columns are missing from the input data:\n' +
                 '\n'.join(missing_cols)
             )
+
+        if site_col not in thresholds.data.columns:
+            raise ValueError(
+                'Site identifying column "{}" must be the same in both ' +
+                'the data file and site list file'.format(site_col)
+            )
+
         self.site_col = site_col
         self.count_col = count_col
         self.dir_col = dir_col
@@ -114,6 +121,11 @@ class CountSite:
                                          'E_R': 'W',
                                          'W_R': 'E'}, inplace=True)
 
+        self.__convert_datetimes(combined_datetime, date_col, time_col,
+                                 hour_only)
+
+    def __convert_datetimes(self, combined_datetime, date_col, time_col,
+                            hour_only):
         if combined_datetime:
             self.data['DateTime'] = self.data[date_col]
             self.data['Date'] = self.data['DateTime'].dt.date
@@ -125,7 +137,9 @@ class CountSite:
             self.data['Date'] = pd.to_datetime(self.data[date_col])
     
             self.data['DateTime'] = self.data['Date'] + time_vals
-        
+
+        self.data['Day'] = self.data['Date'].dt.weekday_name
+        self.data['Month'] = self.data['Date'].dt.month_name
         self.data['Hour'] = self.data['DateTime'].dt.hour
 
     def clean_data(self, std_range=2):
