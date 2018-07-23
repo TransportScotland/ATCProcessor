@@ -3,7 +3,7 @@ import os
 import pandas as pd
 import numpy as np
 
-from .graphs import yearly_scatter
+from .graphs import yearly_scatter, calendar_plot
 
 
 class SiteList:
@@ -72,7 +72,11 @@ class Thresholds:
 
 
 class CountSite:
-    def __init__(self, data, thresholds, output_folder):
+    def __init__(self, data, thresholds, output_folder,
+                 site_col, count_col, dir_col,
+                 date_col, time_col=None,
+                 combined_datetime=False, hour_only=False):
+
         assert type(thresholds) == Thresholds
         self.thresholds = thresholds
 
@@ -85,48 +89,74 @@ class CountSite:
         else:
             self.data = pd.read_csv(data)
 
-        # TODO make flexible for "SiteName" column. What if this column is missing?
-        self.data['SiteName'] = self.data['SiteName'].astype(str)
+        if not combined_datetime and not time_col:
+            raise ValueError(
+                'time_col must be specified when combined_datetime=False'
+            )
 
-        # TODO make flexible for columns. Different names?
-        self.data['DirectionName'].replace({'N_R': 'S',
-                                            'S_R': 'N',
-                                            'E_R': 'W',
-                                            'W_R': 'E'}, inplace=True)
+        # Check columns are present
+        check_cols = [site_col, count_col, dir_col, date_col, time_col]
+        missing_cols = [c for c in check_cols if c not in self.data.columns]
 
-        self.data['DateTime'] = pd.to_datetime(self.data['IntervalStartDate'])\
-                                + pd.to_timedelta(self.data['Hour'], unit='h')
+        if missing_cols:
+            raise ValueError(
+                'The following columns are missing from the input data:\n' +
+                '\n'.join(missing_cols)
+            )
+        self.site_col = site_col
+        self.count_col = count_col
+        self.dir_col = dir_col
 
-        self.data = self.data.groupby(['SiteName', 'DateTime',
-                                       'IntervalStartDate', 'Hour',
-                                       'DirectionName'], as_index=False)\
-                             .agg({'VehicleCount': 'sum'})
+        self.data[self.site_col] = self.data[self.site_col].astype(str)
+
+        self.data[self.dir_col].replace({'N_R': 'S',
+                                         'S_R': 'N',
+                                         'E_R': 'W',
+                                         'W_R': 'E'}, inplace=True)
+
+        if combined_datetime:
+            self.data['DateTime'] = self.data[date_col]
+            self.data['Date'] = self.data['DateTime'].dt.date
+        else:
+            if hour_only:
+                time_vals = pd.to_timedelta(self.data[time_col], unit='h')
+            else:
+                time_vals = pd.to_timedelta(self.data[time_col])
+            self.data['Date'] = pd.to_datetime(self.data[date_col])
+    
+            self.data['DateTime'] = self.data['Date'] + time_vals
+        
+        self.data['Hour'] = self.data['DateTime'].dt.hour
 
     def clean_data(self, std_range=2):
-        # TODO make flexible for columns. Different names?
+        self.data = self.data.groupby([self.site_col, 'DateTime',
+                                       'Date', 'Hour',
+                                       self.dir_col], as_index=False) \
+            .agg({self.count_col: 'sum'})
+
         # Get the thresholds alongside the relevant counts
         combined_thresh = self.data.merge(
             self.thresholds.data, how='left'
-        )[['VehicleCount', 'Low', 'High']]
+        )[[self.count_col, 'Low', 'High']]
 
         # Flag low or high counts
-        low_count = combined_thresh['VehicleCount'] < combined_thresh['Low']
-        high_count = combined_thresh['VehicleCount'] > combined_thresh['High']
+        low_count = combined_thresh[self.count_col] < combined_thresh['Low']
+        high_count = combined_thresh[self.count_col] > combined_thresh['High']
 
         # Add in column to report meeting or failing thresholds
         self.data['ThreshCheck'] = np.select([low_count, high_count], [-1, 1],
                                              default=0)
 
         # Work out instances where day total is 0 - probably a fault
-        daily_total = self.data.groupby('IntervalStartDate', as_index=False)\
-                               .agg({'VehicleCount': 'sum'})
+        daily_total = self.data.groupby('Date', as_index=False)\
+                               .agg({self.count_col: 'sum'})
 
-        daily_total['MissingDay'] = (daily_total['VehicleCount'] == 0)*1
-        daily_total = daily_total[['IntervalStartDate', 'MissingDay']]
+        daily_total['MissingDay'] = (daily_total[self.count_col] == 0)*1
+        daily_total = daily_total[['Date', 'MissingDay']]
 
         self.data = self.data.merge(daily_total)
 
-        # Flag valid where Theshold Check is passed and day isn't totally
+        # Flag valid where Threshold Check is passed and day isn't totally
         # missing
         self.data['Valid'] = (self.data['ThreshCheck'].abs()
                               + self.data['MissingDay']) == 0
@@ -135,8 +165,8 @@ class CountSite:
 
         # Work out the average hourly flow in that direction at the site
         # TODO refine this? Average by hour by day of week?
-        hourly_avg = valid_data.groupby(['SiteName', 'Hour', 'DirectionName'])\
-                               .agg({'VehicleCount': ['mean', 'std']})
+        hourly_avg = valid_data.groupby([self.site_col, 'Hour', self.dir_col])\
+                               .agg({self.count_col: ['mean', 'std']})
         hourly_avg.columns = hourly_avg.columns.droplevel()
         hourly_avg.reset_index(inplace=True)
 
@@ -151,15 +181,15 @@ class CountSite:
         self.data = self.data.merge(hourly_avg)
         self.data['StdWarning'] = (
             self.data['Valid'] &
-            ((self.data['VehicleCount'] < self.data['StdMin'])
-             | (self.data['VehicleCount'] > self.data['StdMax']))
+            ((self.data[self.count_col] < self.data['StdMin'])
+             | (self.data[self.count_col] > self.data['StdMax']))
         ).astype(int)
         self.data.drop(['StdMax', 'StdMin'], axis='columns', inplace=True)
 
         # Sort values so they can be written out neatly
-        self.data = self.data.sort_values(by=['IntervalStartDate',
+        self.data = self.data.sort_values(by=['Date',
                                               'Hour',
-                                              'DirectionName'])\
+                                              self.dir_col])\
                              .reset_index(drop=True)
 
         # Save out cleaned data
@@ -168,7 +198,7 @@ class CountSite:
         if not os.path.isdir(save_folder):
             os.mkdir(save_folder)
 
-        for site, site_data in self.data.groupby('SiteName'):
+        for site, site_data in self.data.groupby(self.site_col):
             site_data.to_csv(
                 os.path.join(save_folder, '{}.csv'.format(site))
             )
@@ -190,11 +220,11 @@ class CountSite:
         )
 
         issue_colours = {
-            'Warning - Outside SD Range': 'orange',
+            'Warning - Outside SD Range': 'darkorange',
             'Full day missing': 'grey',
             'Below threshold': 'black',
             'Above threshold': 'red',
-            'Valid': 'green'
+            'Valid': 'darkturquoise'
         }
 
         self.data['ScatterColour'] = self.data['Status'].map(issue_colours)
@@ -208,17 +238,60 @@ class CountSite:
             os.mkdir(save_folder)
 
         # For each site, generate and save the scatter plots
-        for site_name, site_data in self.data.groupby('SiteName'):
+        for site_name, site_data in self.data.groupby(self.site_col):
             figures = yearly_scatter(site_data, datetime_col='DateTime',
-                                     value_col='VehicleCount',
+                                     value_col=self.count_col,
                                      category_col='Status',
                                      colour_col='ScatterColour',
-                                     dir_col='DirectionName')
+                                     dir_col=self.dir_col)
 
             for year, fig in figures:
                 fig.savefig(
                     os.path.join(
                         save_folder, '{}_{}.png'.format(site_name, year)
+                    ),
+                    bbox_inches='tight'
+                )
+
+    def produce_cal_plots(self, valid_only=True, by_direction=True):
+        if valid_only:
+            save_folder = os.path.join(
+                self.output_folder, 'Cleaned Calendar Plots'
+            )
+            plot_data = self.data[self.data['Valid']]
+        else:
+            save_folder = os.path.join(
+                self.output_folder, 'Uncleaned Calendar Plots'
+            )
+            plot_data = self.data
+
+        grouping = [self.site_col]
+
+        if by_direction:
+            grouping.append(self.dir_col)
+
+        if not os.path.isdir(save_folder):
+            os.mkdir(save_folder)
+
+        plot_data = plot_data.groupby(grouping + ['Date'],
+                                      as_index=False)\
+                             .agg({self.count_col: 'sum'})\
+                             .set_index('Date') \
+                             .groupby(grouping)
+
+        # For each site and direction, generate and save the calendar plot
+        for grp, site_data in plot_data:
+            figures = calendar_plot(site_data, count_column=self.count_col)
+
+            if by_direction:
+                out_name = '_'.join(grp)
+            else:
+                out_name = '{}_Total'.format(grp)
+
+            for fig, ax in figures:
+                fig.savefig(
+                    os.path.join(
+                        save_folder, '{}.png'.format(out_name)
                     ),
                     bbox_inches='tight'
                 )
