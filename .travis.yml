@@ -5,12 +5,12 @@ python:
   - "3.6"
   - "3.5"
   - "2.7"
-  - "nightly"
+  # - "nightly"
 matrix:
   allow_failures:
     - python: "3.5"
     - python: "2.7"
-    - python: "nightly"
+    # - python: "nightly"
 before_install:
     # Download miniconda and install the dependencies
     - export MINICONDA=$HOME/miniconda
@@ -34,6 +34,6 @@ install:
   - pip install pillow
 # command to run tests
 script: 
-  - pytest --cov=./
+  - pytest --cov=atcprocessor
 after_success:
   - codecov
