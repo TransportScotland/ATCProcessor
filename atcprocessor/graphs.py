@@ -1,23 +1,37 @@
+import os
+
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 import matplotlib.dates as mdates
 import pandas as pd
+import seaborn as sns
 
-from .version import __version__
+from .version import VERSION_TITLE
 from .calmap import calmap
 
+sns.set(style='whitegrid')
+
 VERSION_TEXT = '''
-Produced by Transport Scotland ATC Processor v{}
-'''.format(__version__)
+Produced by {}
+'''.format(VERSION_TITLE)
 
 MONTH_LOCATOR = mdates.MonthLocator()
 MONTH_FORMATTER = mdates.DateFormatter('%b\n%Y')
 
 
+def make_folder_if_necessary(filepath):
+    parent_dir = os.path.dirname(filepath)
+
+    if not os.path.exists(parent_dir):
+        os.makedirs(parent_dir)
+
+
 def yearly_scatter(data, datetime_col, value_col, category_col, colour_col,
-                   dir_col, yearlong_x=True):
+                   dir_col, destination_path, yearlong_x=True):
     # Get years without modifying existing frame
     year_values = data[datetime_col].dt.year
+
+    make_folder_if_necessary(destination_path)
 
     # Group by year, set up a plot per year
     for year, year_data in data.groupby(year_values):
@@ -64,12 +78,12 @@ def yearly_scatter(data, datetime_col, value_col, category_col, colour_col,
         axes[-1].legend(handles=colour_patches, ncol=5, loc='upper center',
                         bbox_to_anchor=(0.5, -0.15), fancybox=True)
         plt.tight_layout()
-        # yield the figure so we can close the plot once it has been saved
-        yield year, fig
+        dest = '_{}'.format(year).join(os.path.splitext(destination_path))
+        plt.savefig(dest, bbox_to_inches='tight')
         plt.close('all')
 
 
-def calendar_plot(data, count_column, maxval=None):
+def calendar_plot(data, count_column, destination_path, maxval=None):
     if maxval is None:
         maxval = data[count_column].max()
 
@@ -89,7 +103,37 @@ def calendar_plot(data, count_column, maxval=None):
     cbar.ax.text(-0.2, 0.5, VERSION_TEXT,
                  rotation=90, alpha=0.5,
                  va='center', ha='center',
-                 size='xx-small')
+                 size='x-small')
 
-    yield fig, ax
+    make_folder_if_necessary(destination_path)
+    plt.savefig(destination_path, bbox_to_inches='tight')
+    plt.close('all')
+
+
+def atc_facet_grid(data, separate_rows, separate_cols, x, y, destination_path,
+                   hue=None):
+    g = sns.FacetGrid(data, row=separate_rows, col=separate_cols,
+                      # hue=hue, height=1.5, aspect=4,
+                      hue=hue, height=1.4, aspect=2.7,
+                      legend_out=True, margin_titles=True)
+    g.map(plt.plot, x, y, marker=None)
+    g.add_legend()
+    g.axes[-1, 0].set_xlabel(x)
+
+    g.axes[0,0].margins(x=0)
+    g.set(xticks=range(0, 24, 2))
+    g.set_xticklabels(['{:02d}:00'.format(x) for x in range(0, 24, 2)],
+                      rotation=90)
+    g.axes[0,0].set_ylim(bottom=0)
+    g.fig.tight_layout()
+
+    # Clear original text before adding titles
+    for ax in g.axes.flat:
+        plt.setp(ax.texts, text="")
+
+    g.set_titles(row_template='{row_name}', col_template='{col_name}')
+    # plt.savefig('test.png', bbox_to_inches='tight')
+    # plt.show()
+    make_folder_if_necessary(destination_path)
+    plt.savefig(destination_path, bbox_to_inches='tight')
     plt.close('all')
