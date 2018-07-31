@@ -4,6 +4,7 @@ import pytest
 
 from .. import graphs
 
+
 class TestGraphs:
     @pytest.fixture(autouse=True)
     def setup(self, tmpdir_factory):
@@ -11,7 +12,7 @@ class TestGraphs:
 
     def test_make_folder(self):
         graphs.make_folder_if_necessary(
-            self.output_folder.join('Test').join('file.png')
+            str(self.output_folder.join('Test').join('file.png'))
         )
 
         assert os.path.isdir(self.output_folder.join('Test'))
