@@ -125,15 +125,13 @@ def atc_facet_grid(data, separate_rows, separate_cols, x, y, destination_path,
     g.set_xticklabels(['{:02d}:00'.format(x) for x in range(0, 24, 2)],
                       rotation=90)
     g.axes[0,0].set_ylim(bottom=0)
-    g.fig.tight_layout()
 
     # Clear original text before adding titles
     for ax in g.axes.flat:
         plt.setp(ax.texts, text="")
 
     g.set_titles(row_template='{row_name}', col_template='{col_name}')
-    # plt.savefig('test.png', bbox_to_inches='tight')
-    # plt.show()
     make_folder_if_necessary(destination_path)
+    # TODO work out why "Hour" label is being cut off
     plt.savefig(destination_path, bbox_to_inches='tight')
     plt.close('all')
