@@ -146,6 +146,7 @@ class CountSite:
             self.data['Date'].dt.month_name(),
             categories=calendar.month_name[1:], ordered=True
         )
+        self.data['WeekNumber'] = self.data['Date'].dt.week
         self.data['Day'] = pd.Categorical(
             self.data['Date'].dt.weekday_name,
             categories=calendar.day_name, ordered=True
@@ -159,7 +160,8 @@ class CountSite:
                 'Thresholds required to clean data'
             )
         self.data = self.data.groupby([self.site_col, 'DateTime',
-                                       'Date', 'Year', 'Month', 'Day', 'Hour',
+                                       'Date', 'Year', 'Month', 'WeekNumber',
+                                       'Day', 'Hour',
                                        self.dir_col], as_index=False) \
             .agg({self.count_col: 'sum'})
 
@@ -348,14 +350,20 @@ class CountSite:
 
     def facet_grids(self, valid_only=True, by_direction=True):
         print('Faceting...')
-        plot_data = self.data.groupby([self.site_col,
+
+        if valid_only:
+            plot_data = self.data[self.data['Valid']]
+        else:
+            plot_data = self.data
+
+        hour_data = plot_data.groupby([self.site_col,
                                        'Year', 'Day', 'Hour',
                                        self.dir_col],
                                       as_index=False) \
                              .agg({self.count_col: 'mean'})\
                              .groupby(self.site_col)
 
-        for site_name, site_data in plot_data:
+        for site_name, site_data in hour_data:
             atc_facet_grid(site_data, separate_rows='Day',
                            separate_cols='Year',
                            x='Hour', y=self.count_col,
@@ -363,5 +371,22 @@ class CountSite:
                            destination_path=os.path.join(
                                self.output_folder, site_name,
                                'Hourly Average by Day.png')
+                           )
+
+        week_data = plot_data.groupby([self.site_col,
+                                       'Year', 'Day', 'WeekNumber',
+                                       self.dir_col],
+                                      as_index=False) \
+                             .agg({self.count_col: 'sum'})\
+                             .groupby(self.site_col)
+
+        for site_name, site_data in week_data:
+            atc_facet_grid(site_data, separate_rows='Day',
+                           separate_cols=self.dir_col,
+                           x='WeekNumber', y=self.count_col,
+                           hue='Year',
+                           destination_path=os.path.join(
+                               self.output_folder, site_name,
+                               'Week Total by Day.png')
                            )
 

@@ -120,11 +120,13 @@ def atc_facet_grid(data, separate_rows, separate_cols, x, y, destination_path,
     g.add_legend()
     g.axes[-1, 0].set_xlabel(x)
 
-    g.axes[0,0].margins(x=0)
-    g.set(xticks=range(0, 24, 2))
-    g.set_xticklabels(['{:02d}:00'.format(x) for x in range(0, 24, 2)],
-                      rotation=90)
-    g.axes[0,0].set_ylim(bottom=0)
+    g.axes[0, 0].margins(x=0)
+
+    if x.lower() == 'hour':
+        g.set(xticks=range(0, 24, 2))
+        g.set_xticklabels(['{:02d}:00'.format(x) for x in range(0, 24, 2)],
+                          rotation=90)
+    g.axes[0, 0].set_ylim(bottom=0)
 
     # Clear original text before adding titles
     for ax in g.axes.flat:
