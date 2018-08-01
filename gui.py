@@ -11,7 +11,7 @@ except ImportError:
     import ttk
     import tkMessageBox as messagebox
 
-from atcprocessor.processor import CountSite, Thresholds
+from atcprocessor import processor
 from atcprocessor.version import VERSION_TITLE
 
 
@@ -97,7 +97,7 @@ class ATCProcessorGUI(tk.Frame):
     def run(self):
         # TODO work out why the GUI suddenly changes size. Is this consistent?
         # TODO get the variables in a neater way
-        thresh = Thresholds(
+        thresh = processor.Thresholds(
             path_to_csv=self.store['File Inputs'].variables['Thresholds File'].get(),
             site_list=self.store['File Inputs'].variables['Site List File'].get()
         )
@@ -112,15 +112,15 @@ class ATCProcessorGUI(tk.Frame):
         time_col = self.store['Columns'].variables['Time Column'].get()
 
         for f in glob(os.path.join(input_folder, '*.csv')):
-            c = CountSite(data=f, output_folder=output_folder,
-                          site_col=site_col, count_col=count_col,
-                          dir_col=dir_col, date_col=date_col, time_col=time_col,
-                          thresholds=thresh)
+            c = processor.CountSite(data=f, output_folder=output_folder,
+                                    site_col=site_col, count_col=count_col,
+                                    dir_col=dir_col, date_col=date_col,
+                                    time_col=time_col,
+                                    thresholds=thresh, hour_only=True)
 
             c.clean_data()
             c.summarise_cleaned_data()
             c.cleaned_scatter()
-            # TODO work out why FacetGrid plots are not working
             c.facet_grids()
             c.produce_cal_plots()
 
