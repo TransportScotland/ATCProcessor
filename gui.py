@@ -11,7 +11,7 @@ except ImportError:
     import ttk
     import tkMessageBox as messagebox
 
-from atcprocessor.processor import CountSite
+from atcprocessor.processor import CountSite, Thresholds
 from atcprocessor.version import VERSION_TITLE
 
 
@@ -27,7 +27,7 @@ class ATCProcessorGUI(tk.Frame):
             input_names=('Input Folder', 'Site List File', 'Thresholds File',
                          'Output Folder')
         )
-        self.store['File Inputs'].grid(row=1, column=0, sticky='WE')
+        self.store['File Inputs'].grid(row=0, column=0, sticky='WE')
 
         columns_to_choose = (
             'Site Name Column', 'Count Column', 'Direction Column',
@@ -39,9 +39,13 @@ class ATCProcessorGUI(tk.Frame):
             folder_variable=self.store['File Inputs'].variables['Input Folder']
         )
 
-        self.store['Columns'].grid(row=2, column=0, sticky='WE')
+        self.store['Columns'].grid(row=1, column=0, sticky='WE')
 
         self.grid_columnconfigure(0, weight=1)
+
+        self.run_button = tk.Button(self, text='Run',
+                                    command=lambda: self.run())
+        self.run_button.grid(row=2, column=0, columnspan=2)
 
         # Set up menu bar for advanced settings
         menu_bar = tk.Menu(parent)
@@ -72,6 +76,9 @@ class ATCProcessorGUI(tk.Frame):
             with open(res, 'w') as f:
                 json.dump(all_settings, f, indent=4)
 
+            messagebox.showinfo(title='Settings saved!',
+                                message='Settings saved successfully.')
+
     def load_settings(self):
         res = filedialog.askopenfilename(
             filetypes=[('JSON file', '*.json')]
@@ -83,6 +90,42 @@ class ATCProcessorGUI(tk.Frame):
             for name, widget in self.store.items():
                 for k, v in all_settings[name].items():
                     widget.variables[k].set(v)
+
+            messagebox.showinfo(title='Settings loaded!',
+                                message='Settings loaded successfully.')
+
+    def run(self):
+        # TODO work out why the GUI suddenly changes size. Is this consistent?
+        # TODO get the variables in a neater way
+        thresh = Thresholds(
+            path_to_csv=self.store['File Inputs'].variables['Thresholds File'].get(),
+            site_list=self.store['File Inputs'].variables['Site List File'].get()
+        )
+
+        input_folder = self.store['File Inputs'].variables['Input Folder'].get()
+        output_folder = self.store['File Inputs'].variables['Output Folder'].get()
+
+        site_col = self.store['Columns'].variables['Site Name Column'].get()
+        count_col = self.store['Columns'].variables['Count Column'].get()
+        dir_col = self.store['Columns'].variables['Direction Column'].get()
+        date_col = self.store['Columns'].variables['Date Column'].get()
+        time_col = self.store['Columns'].variables['Time Column'].get()
+
+        for f in glob(os.path.join(input_folder, '*.csv')):
+            c = CountSite(data=f, output_folder=output_folder,
+                          site_col=site_col, count_col=count_col,
+                          dir_col=dir_col, date_col=date_col, time_col=time_col,
+                          thresholds=thresh)
+
+            c.clean_data()
+            c.summarise_cleaned_data()
+            c.cleaned_scatter()
+            # TODO work out why FacetGrid plots are not working
+            c.facet_grids()
+            c.produce_cal_plots()
+
+        messagebox.showinfo(title='Finished',
+                            message='Processing complete')
 
 
 class FileInputs(tk.LabelFrame):
@@ -140,7 +183,7 @@ class ColumnSelector(tk.LabelFrame):
         for i, (inp, var) in enumerate(self.variables.items()):
             lab = tk.Label(self, text=inp)
             choice = ttk.Combobox(self, values=self.values,
-                                  textvariable=var)
+                                  textvariable=var, width=50)
 
             choice.configure(
                 postcommand=lambda choice=choice: self.combo_update(box=choice)
@@ -154,15 +197,21 @@ class ColumnSelector(tk.LabelFrame):
 
     def update_choices(self):
         # TODO validate that a file exists.
-        first_file = glob(os.path.join(self.folder_variable.get(), '*.csv'))[0]
-        with open(first_file, 'r') as f:
-            columns = f.readline().split(',')
+        files = glob(os.path.join(self.folder_variable.get(), '*.csv'))
+        if files:
+            with open(files[0], 'r') as f:
+                columns = f.readline().split(',')
 
-        # Line will probably end with a carriage return
-        # TODO consider a single-line file (i.e. no data). What happens?
-        if columns[-1].endswith('\n'):
-            columns[-1] = columns[-1][:-1]
-        self.values = columns
+            # Line will probably end with a carriage return
+            # TODO consider a single-line file (i.e. no data). What happens?
+            if columns[-1].endswith('\n'):
+                columns[-1] = columns[-1][:-1]
+            self.values = columns
+        else:
+            messagebox.showerror(title='No CSV files found',
+                                 message='No CSV files could be found in the '
+                                         'chosen folder. Please check your '
+                                         'inputs.')
 
 
 if __name__ == "__main__":
