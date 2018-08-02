@@ -334,6 +334,7 @@ class CountSite:
 
         # For each site and direction, generate and save the calendar plot
         for grp, site_data in plot_data:
+            grp = tuple(grp)
             site_data = site_data[
                 site_data[(self.count_col, 'count')] >= min_hours
             ]
@@ -356,37 +357,47 @@ class CountSite:
         else:
             plot_data = self.data
 
-        hour_data = plot_data.groupby([self.site_col,
-                                       'Year', 'Day', 'Hour',
-                                       self.dir_col],
-                                      as_index=False) \
-                             .agg({self.count_col: 'mean'})\
-                             .groupby(self.site_col)
+        suffix = ''
+        hour_group = [self.site_col, 'Year', 'Day', 'Hour']
+        week_group = [self.site_col, 'Year', 'Day', 'WeekNumber']
+        hour_params = dict()
+        week_params = dict()
+        if by_direction:
+            suffix += ' by direction'
+            hour_group.append(self.dir_col)
+            hour_params['hue'] = self.dir_col
+            week_group.append(self.dir_col)
+            week_params['separate_cols'] = self.dir_col
+        if valid_only:
+            suffix += '_Valid Only'
 
-        for site_name, site_data in hour_data:
+        hour_data = plot_data.groupby(hour_group, as_index=False) \
+                             .agg({self.count_col: 'mean'})
+
+        for site_name, site_data in hour_data.groupby(self.site_col):
+            file_name = os.path.join(
+                self.output_folder, site_name,
+                'Hourly Average by Day{}.png'.format(suffix)
+            )
+
             atc_facet_grid(site_data, separate_rows='Day',
                            separate_cols='Year',
                            x='Hour', y=self.count_col,
-                           hue=self.dir_col,
-                           destination_path=os.path.join(
-                               self.output_folder, site_name,
-                               'Hourly Average by Day.png')
-                           )
+                           destination_path=file_name,
+                           **hour_params)
 
-        week_data = plot_data.groupby([self.site_col,
-                                       'Year', 'Day', 'WeekNumber',
-                                       self.dir_col],
-                                      as_index=False) \
-                             .agg({self.count_col: 'sum'})\
-                             .groupby(self.site_col)
+        week_data = plot_data.groupby(week_group, as_index=False) \
+                             .agg({self.count_col: 'sum'})
 
-        for site_name, site_data in week_data:
+        for site_name, site_data in week_data.groupby(self.site_col):
+            file_name = os.path.join(
+                self.output_folder, site_name,
+                'Week Total by Day{}.png'.format(suffix)
+            )
             atc_facet_grid(site_data, separate_rows='Day',
-                           separate_cols=self.dir_col,
                            x='WeekNumber', y=self.count_col,
                            hue='Year',
-                           destination_path=os.path.join(
-                               self.output_folder, site_name,
-                               'Week Total by Day.png')
+                           destination_path=file_name,
+                           **week_params
                            )
 
