@@ -20,7 +20,7 @@ class TestProcessor:
         )
 
         self.count_site = processor.CountSite(
-            data=os.path.join(self.datadir, 'sites', 'site 1 dummy data.csv'),
+            data=os.path.join(self.datadir, 'sites', 'Site 1 Dummy Data.csv'),
             output_folder=self.output_folder,
             site_col='Site',
             count_col='Count',
@@ -34,12 +34,12 @@ class TestProcessor:
     def test_cleaning(self):
         self.count_site.clean_data()
         cleaning_result = pd.read_csv(
-            os.path.join(self.output_folder, 'cleaned data', 'site 1.csv')
+            os.path.join(self.output_folder, 'Cleaned Data', 'Site 1.csv')
         )
 
         known_clean = pd.read_csv(
-            os.path.join(self.datadir, 'outputs', 'cleaned data',
-                         'site 1.csv')
+            os.path.join(self.datadir, 'outputs', 'Cleaned Data',
+                         'Site 1.csv')
         )
 
         assert cleaning_result.equals(known_clean)
