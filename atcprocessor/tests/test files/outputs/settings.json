@@ -1,0 +1,16 @@
+{
+    "input_folder": "C:\\Users\\ruszkowskia\\PycharmProjects\\00 Dedicated Projects\\07 NTDS Processing Tool\\01 ATC Processor\\atcprocessor\\tests\\test files\\sites",
+    "site_list": "C:\\Users\\ruszkowskia\\PycharmProjects\\00 Dedicated Projects\\07 NTDS Processing Tool\\01 ATC Processor\\atcprocessor\\tests\\test files\\site list.csv",
+    "path_to_csv": "C:\\Users\\ruszkowskia\\PycharmProjects\\00 Dedicated Projects\\07 NTDS Processing Tool\\01 ATC Processor\\atcprocessor\\tests\\test files\\thresholds.csv",
+    "output_folder": "C:\\Users\\ruszkowskia\\PycharmProjects\\00 Dedicated Projects\\07 NTDS Processing Tool\\01 ATC Processor\\atcprocessor\\tests\\outputs",
+    "site_col": "Site",
+    "count_col": "Count",
+    "dir_col": "Direction",
+    "date_col": "Date",
+    "time_col": "Hour",
+    "std_range": 2.0,
+    "combined_datetime": false,
+    "hour_only": true,
+    "by_direction": true,
+    "valid_only": true
+}
