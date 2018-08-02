@@ -19,24 +19,54 @@ class ATCProcessorGUI(tk.Frame):
     def __init__(self, parent, *args, **kwargs):
         super(ATCProcessorGUI, self).__init__(parent, padx=5, pady=5,
                                               *args, **kwargs)
+        self.parent = parent
+
+        # Keep variables within the main window for ease of access
+        self.variables = {
+            'input_folder': ('Input Folder', tk.StringVar()),
+            'site_list': ('Site List File', tk.StringVar()),
+            'path_to_csv': ('Thresholds File', tk.StringVar()),
+            'output_folder': ('Output Folder', tk.StringVar()),
+            'site_col': ('Site Name Column', tk.StringVar()),
+            'count_col': ('Count Column', tk.StringVar()),
+            'dir_col': ('Direction Column', tk.StringVar()),
+            'date_col': ('Date Column', tk.StringVar()),
+            'time_col': ('Time Column', tk.StringVar()),
+            'std_range': ('Acceptable Standard Deviation range (±)',
+                          tk.DoubleVar()),
+            'combined_datetime': ('Date column includes Time?',
+                                  tk.BooleanVar()),
+            'hour_only': ('Time column provides hour only?', tk.BooleanVar()),
+            'by_direction': ('Output graphs by direction?', tk.BooleanVar()),
+            'valid_only': ('Restrict graphs to "Valid" data only?',
+                           tk.BooleanVar()),
+        }
+
+        # Defaults for advanced settings
+        self.variables['std_range'][1].set(2.0)
+        self.variables['combined_datetime'][1].set(False)
+        self.variables['by_direction'][1].set(True)
+        self.variables['hour_only'][1].set(True)
+        self.variables['valid_only'][1].set(True)
 
         self.store = dict()
-
         self.store['File Inputs'] = FileInputs(
             self, section_name='File Inputs',
-            input_names=('Input Folder', 'Site List File', 'Thresholds File',
-                         'Output Folder')
+            inputs=(self.variables['input_folder'],
+                    self.variables['site_list'],
+                    self.variables['path_to_csv'],
+                    self.variables['output_folder'])
         )
         self.store['File Inputs'].grid(row=0, column=0, sticky='WE')
 
-        columns_to_choose = (
-            'Site Name Column', 'Count Column', 'Direction Column',
-            'Date Column', 'Time Column'
-        )
-
         self.store['Columns'] = ColumnSelector(
-            self, section_name='Choose Columns', input_names=columns_to_choose,
-            folder_variable=self.store['File Inputs'].variables['Input Folder']
+            self, section_name='Choose Columns',
+            inputs=(self.variables['site_col'],
+                    self.variables['count_col'],
+                    self.variables['dir_col'],
+                    self.variables['date_col'],
+                    self.variables['time_col']),
+            folder_variable=self.variables['input_folder'][1]
         )
 
         self.store['Columns'].grid(row=1, column=0, sticky='WE')
@@ -55,29 +85,34 @@ class ATCProcessorGUI(tk.Frame):
         menu_bar.add_cascade(label='Options', menu=options)
 
         # TODO set up advanced settings
-        # options.add_command(label='Advanced Settings')
-        # options.add_separator()
+        options.add_command(label='Advanced Settings',
+                            command=lambda: self.show_advanced_settings())
+        options.add_separator()
         options.add_command(label='Load Settings',
                             command=lambda: self.load_settings())
         options.add_command(label='Save Settings',
                             command=lambda: self.save_settings())
 
-    def save_settings(self):
+    def save_settings(self, use_dialogs=True, file_path=None):
         all_settings = {
-            name: {k: v.get() for k, v in widget.variables.items()}
-            for name, widget in self.store.items()
+            k: v[1].get() for k, v in self.variables.items()
         }
 
-        res = filedialog.asksaveasfilename(
-            defaultextension='.json',
-            filetypes=[('JSON file', '*.json')]
-        )
+        if use_dialogs:
+            res = filedialog.asksaveasfilename(
+                defaultextension='.json',
+                filetypes=[('JSON file', '*.json')]
+            )
+        else:
+            res = file_path
+
         if res:
             with open(res, 'w') as f:
                 json.dump(all_settings, f, indent=4)
 
-            messagebox.showinfo(title='Settings saved!',
-                                message='Settings saved successfully.')
+            if use_dialogs:
+                messagebox.showinfo(title='Settings saved!',
+                                    message='Settings saved successfully.')
 
     def load_settings(self):
         res = filedialog.askopenfilename(
@@ -87,56 +122,69 @@ class ATCProcessorGUI(tk.Frame):
             with open(res, 'r') as f:
                 all_settings = json.load(f)
 
-            for name, widget in self.store.items():
-                for k, v in all_settings[name].items():
-                    widget.variables[k].set(v)
+            for k, v in all_settings.items():
+                self.variables[k][1].set(v)
 
             messagebox.showinfo(title='Settings loaded!',
                                 message='Settings loaded successfully.')
 
-    def run(self):
-        # TODO work out why the GUI suddenly changes size. Is this consistent?
-        # TODO get the variables in a neater way
-        thresh = processor.Thresholds(
-            path_to_csv=self.store['File Inputs'].variables['Thresholds File'].get(),
-            site_list=self.store['File Inputs'].variables['Site List File'].get()
+    def show_advanced_settings(self):
+        adv = AdvancedSettings(
+            self.parent,
+            inputs=(self.variables['combined_datetime'],
+                    self.variables['hour_only'],
+                    self.variables['std_range'],
+                    self.variables['by_direction'],
+                    self.variables['valid_only']),
+            title='Advanced Settings'
         )
 
-        input_folder = self.store['File Inputs'].variables['Input Folder'].get()
-        output_folder = self.store['File Inputs'].variables['Output Folder'].get()
+    def run(self):
+        # TODO work out why the GUI suddenly changes size. Is this consistent?
 
-        site_col = self.store['Columns'].variables['Site Name Column'].get()
-        count_col = self.store['Columns'].variables['Count Column'].get()
-        dir_col = self.store['Columns'].variables['Direction Column'].get()
-        date_col = self.store['Columns'].variables['Date Column'].get()
-        time_col = self.store['Columns'].variables['Time Column'].get()
+        params = {
+            param: var.get() for param, (name, var) in self.variables.items()
+        }
 
-        for f in glob(os.path.join(input_folder, '*.csv')):
-            c = processor.CountSite(data=f, output_folder=output_folder,
-                                    site_col=site_col, count_col=count_col,
-                                    dir_col=dir_col, date_col=date_col,
-                                    time_col=time_col,
-                                    thresholds=thresh, hour_only=True)
+        self.save_settings(
+            use_dialogs=False,
+            file_path=os.path.join(params['output_folder'], 'settings.json')
+        )
 
-            c.clean_data()
+        thresh = processor.Thresholds(
+            path_to_csv=params['path_to_csv'],
+            site_list=params['site_list']
+        )
+
+        for f in glob(os.path.join(params['input_folder'], '*.csv')):
+            c = processor.CountSite(data=f, thresholds=thresh,
+                                    output_folder=params['output_folder'],
+                                    site_col=params['site_col'],
+                                    count_col=params['count_col'],
+                                    dir_col=params['dir_col'],
+                                    date_col=params['date_col'],
+                                    time_col=params['time_col'],
+                                    hour_only=params['hour_only'])
+
+            c.clean_data(std_range=params['std_range'])
             c.summarise_cleaned_data()
             c.cleaned_scatter()
-            c.facet_grids()
-            c.produce_cal_plots()
+            c.facet_grids(valid_only=params['valid_only'],
+                          by_direction=params['by_direction'])
+            c.produce_cal_plots(valid_only=params['valid_only'],
+                                by_direction=params['by_direction'])
 
         messagebox.showinfo(title='Finished',
                             message='Processing complete')
 
 
 class FileInputs(tk.LabelFrame):
-    def __init__(self, parent, section_name, input_names, *args, **kwargs):
+    def __init__(self, parent, section_name, inputs, *args, **kwargs):
         super(FileInputs, self).__init__(parent, text=section_name,
                                          padx=5, pady=5,
                                          *args, **kwargs)
 
-        self.variables = {inp: tk.StringVar() for inp in input_names}
-
-        for i, (inp, var) in enumerate(self.variables.items()):
+        for i, (inp, var) in enumerate(inputs):
             lab = tk.Label(self, text=inp)
             ent = tk.Entry(self, width=60, textvariable=var)
 
@@ -166,13 +214,12 @@ class FileInputs(tk.LabelFrame):
 
 
 class ColumnSelector(tk.LabelFrame):
-    def __init__(self, parent, section_name, input_names, folder_variable,
+    def __init__(self, parent, section_name, inputs, folder_variable,
                  *args, **kwargs):
         super(ColumnSelector, self).__init__(parent, text=section_name,
                                              padx=5, pady=5,
                                              *args, **kwargs)
 
-        self.variables = {inp: tk.StringVar() for inp in input_names}
         self.folder_variable = folder_variable
         self.values = ['<Columns not loaded>']
 
@@ -180,7 +227,7 @@ class ColumnSelector(tk.LabelFrame):
                          command=lambda: self.update_choices())
         butt.grid(row=0, column=0, columnspan=2)
 
-        for i, (inp, var) in enumerate(self.variables.items()):
+        for i, (inp, var) in enumerate(inputs):
             lab = tk.Label(self, text=inp)
             choice = ttk.Combobox(self, values=self.values,
                                   textvariable=var, width=50)
@@ -212,6 +259,41 @@ class ColumnSelector(tk.LabelFrame):
                                  message='No CSV files could be found in the '
                                          'chosen folder. Please check your '
                                          'inputs.')
+
+
+class AdvancedSettings(tk.Toplevel):
+    def __init__(self, parent, inputs, title):
+        super(AdvancedSettings, self).__init__(parent)
+        self.title(title)
+
+        validate_float = (parent.register(self.__validate_float), '%P')
+        for i, (inp, var) in enumerate(inputs):
+            if type(var) == tk.DoubleVar:
+                lab = tk.Label(self, text=inp)
+                ent = tk.Entry(self, textvariable=var, validate='all',
+                               validatecommand=validate_float)
+
+                lab.grid(row=i, column=0)
+                ent.grid(row=i, column=1)
+
+            if type(var) == tk.BooleanVar:
+                chk = tk.Checkbutton(self, text=inp, variable=var)
+                chk.grid(row=i, column=0, columnspan=2, sticky='W')
+
+        close_button = tk.Button(self, text='Close',
+                                 command=lambda: self.destroy())
+        close_button.grid(row=i+1, column=0, columnspan=2)
+
+        self.resizable(False, False)
+        self.grab_set()
+
+    @staticmethod
+    def __validate_float(new_value):
+        try:
+            float(new_value)
+            return True
+        except ValueError:
+            return False
 
 
 if __name__ == "__main__":
