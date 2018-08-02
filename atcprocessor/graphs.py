@@ -98,6 +98,7 @@ def calendar_plot(data, count_column, destination_path, maxval=None):
     # Add colour bar and watermark.
     cbar = fig.colorbar(ax[0].get_children()[1], ax=ax.ravel().tolist(),
                         pad=0.1)
+    cbar.outline.set_edgecolor('black')
     cbar.ax.set_ylabel('Total traffic (vehs)')
 
     cbar.ax.text(-0.2, 0.5, VERSION_TEXT,
