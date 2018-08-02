@@ -15,4 +15,4 @@ class TestGraphs:
             str(self.output_folder.join('Test').join('file.png'))
         )
 
-        assert os.path.isdir(self.output_folder.join('Test'))
+        assert os.path.isdir(str(self.output_folder.join('Test')))

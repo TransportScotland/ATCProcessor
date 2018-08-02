@@ -6,29 +6,21 @@ import pandas as pd
 
 from .. import processor
 
-@pytest.fixture
-def datadir(tmpdir, request):
-    """
-    Copies the directory containing test files to a location for further use.
-    """
-    dir_util.copy_tree(os.path.join(os.path.dirname(__file__), 'test files'),
-                       str(tmpdir))
-
-    return tmpdir
-
 
 class TestProcessor:
     @pytest.fixture(autouse=True)
-    def setup(self, tmpdir_factory, datadir):
+    def setup(self, tmpdir_factory):
         self.output_folder = tmpdir_factory.mktemp('Outputs')
 
+        self.datadir = os.path.join(os.path.dirname(__file__), 'test files')
+
         self.thresholds = processor.Thresholds(
-            path_to_csv=os.path.join(datadir, 'thresholds.csv'),
-            site_list=os.path.join(datadir, 'site list.csv')
+            path_to_csv=os.path.join(self.datadir, 'thresholds.csv'),
+            site_list=os.path.join(self.datadir, 'site list.csv')
         )
 
         self.count_site = processor.CountSite(
-            data=os.path.join(datadir, 'sites', 'site 1 dummy data.csv'),
+            data=os.path.join(self.datadir, 'sites', 'site 1 dummy data.csv'),
             output_folder=self.output_folder,
             site_col='Site',
             count_col='Count',
@@ -39,14 +31,14 @@ class TestProcessor:
             thresholds=self.thresholds
         )
 
-    def test_cleaning(self, datadir):
+    def test_cleaning(self):
         self.count_site.clean_data()
         cleaning_result = pd.read_csv(
             os.path.join(self.output_folder, 'cleaned data', 'site 1.csv')
         )
 
         known_clean = pd.read_csv(
-            os.path.join(datadir, 'outputs', 'cleaned data',
+            os.path.join(self.datadir, 'outputs', 'cleaned data',
                          'site 1.csv')
         )
 
