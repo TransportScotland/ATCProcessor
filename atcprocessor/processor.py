@@ -334,7 +334,8 @@ class CountSite:
 
         # For each site and direction, generate and save the calendar plot
         for grp, site_data in plot_data:
-            grp = tuple(grp)
+            if type(grp) == str:
+                grp = [grp]
             site_data = site_data[
                 site_data[(self.count_col, 'count')] >= min_hours
             ]
@@ -371,6 +372,11 @@ class CountSite:
         if valid_only:
             suffix += '_Valid Only'
 
+        if not by_direction:
+            cols = [c for c in plot_data.columns
+                    if c not in (self.dir_col, self.count_col)]
+            plot_data = plot_data.groupby(cols, as_index=False) \
+                                 .agg({self.count_col: 'sum'})
         hour_data = plot_data.groupby(hour_group, as_index=False) \
                              .agg({self.count_col: 'mean'})
 
