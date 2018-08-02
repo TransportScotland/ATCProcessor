@@ -110,8 +110,8 @@ def calendar_plot(data, count_column, destination_path, maxval=None):
     plt.close('all')
 
 
-def atc_facet_grid(data, separate_rows, separate_cols, x, y, destination_path,
-                   hue=None):
+def atc_facet_grid(data, separate_rows, x, y, destination_path,
+                   separate_cols=None, hue=None):
     g = sns.FacetGrid(data, row=separate_rows, col=separate_cols,
                       # hue=hue, height=1.5, aspect=4,
                       hue=hue, height=1.4, aspect=2.7,
