@@ -90,6 +90,8 @@ class CountSite:
         if type(data) == pd.DataFrame:
             self.data = data
         else:
+            if not os.path.isfile(data):
+                raise FileNotFoundError('Data file does not seem to exist.')
             self.data = pd.read_csv(data)
 
         if not combined_datetime and not time_col:
@@ -98,7 +100,9 @@ class CountSite:
             )
 
         # Check columns are present
-        check_cols = [site_col, count_col, dir_col, date_col, time_col]
+        check_cols = [site_col, count_col, dir_col, date_col]
+        if not combined_datetime:
+            check_cols.append(time_col)
         missing_cols = [c for c in check_cols if c not in self.data.columns]
 
         if missing_cols:
@@ -240,7 +244,8 @@ class CountSite:
 
         # Get all possible combinations of the columns
         summary_options = chain(
-            *map(lambda x: list(combinations(sum_cats, x)), range(1, len(sum_cats)+1))
+            *map(lambda x: list(combinations(sum_cats, x)),
+                 range(1, len(sum_cats)+1))
         )
 
         for site, site_data in self.data.groupby(self.site_col):
