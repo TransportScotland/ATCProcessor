@@ -12,6 +12,7 @@ except ImportError:
     import tkMessageBox as messagebox
 
 from atcprocessor import processor
+from atcprocessor.utilities import make_folder_if_necessary
 from atcprocessor.version import VERSION_TITLE
 
 
@@ -179,10 +180,10 @@ class ATCProcessorGUI(tk.Frame):
                         'chosen:\n{}'.format(v)
             )
 
-        self.save_settings(
-            use_dialogs=False,
-            file_path=os.path.join(params['output_folder'], 'settings.json')
-        )
+        # Save settings, making the folder if needs be
+        settings_dest = os.path.join(params['output_folder'], 'settings.json')
+        make_folder_if_necessary(settings_dest)
+        self.save_settings(use_dialogs=False, file_path=settings_dest)
 
         input_files = glob(os.path.join(params['input_folder'], '*.csv'))
         if input_files:

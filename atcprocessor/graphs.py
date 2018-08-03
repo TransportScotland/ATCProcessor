@@ -6,6 +6,7 @@ import matplotlib.dates as mdates
 import pandas as pd
 import seaborn as sns
 
+from .utilities import make_folder_if_necessary
 from .version import VERSION_TITLE
 from .calmap import calmap
 
@@ -17,13 +18,6 @@ Produced by {}
 
 MONTH_LOCATOR = mdates.MonthLocator()
 MONTH_FORMATTER = mdates.DateFormatter('%b\n%Y')
-
-
-def make_folder_if_necessary(filepath):
-    parent_dir = os.path.dirname(filepath)
-
-    if not os.path.exists(parent_dir):
-        os.makedirs(parent_dir)
 
 
 def yearly_scatter(data, datetime_col, value_col, category_col, colour_col,

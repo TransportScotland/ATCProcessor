@@ -5,6 +5,7 @@ from itertools import chain, combinations
 import pandas as pd
 import numpy as np
 
+from .utilities import make_folder_if_necessary
 from .graphs import yearly_scatter, calendar_plot, atc_facet_grid
 
 
@@ -233,15 +234,11 @@ class CountSite:
                              .reset_index(drop=True)
 
         # Save out cleaned data
-        save_folder = os.path.join(self.output_folder, 'Cleaned Data')
-
-        if not os.path.isdir(save_folder):
-            os.mkdir(save_folder)
-
         for site, site_data in self.data.groupby(self.site_col):
-            site_data.to_csv(
-                os.path.join(save_folder, '{}.csv'.format(site)), index=False
-            )
+            dest = os.path.join(self.output_folder, site,
+                                '{} - Cleaned.csv'.format(site))
+            make_folder_if_necessary(dest)
+            site_data.to_csv(dest, index=False)
 
     def summarise_cleaned_data(self):
         # Columns to summarise over
@@ -277,9 +274,12 @@ class CountSite:
                                                          + summaries['Not Valid'])
 
             # TODO improve the output name and location
+            dest = os.path.join(self.output_folder, site,
+                                '{} Cleaning Summary.csv'.format(site))
+            make_folder_if_necessary(dest)
+
             summaries[sum_cats + ['Valid', 'Not Valid', 'Valid_%']].to_csv(
-                os.path.join(self.output_folder, '{} Cleaning Summary.csv'.format(site)),
-                index=False
+                dest, index=False
             )
 
     def cleaned_scatter(self):
@@ -311,7 +311,7 @@ class CountSite:
 
         # For each site, generate and save the scatter plots
         for site_name, site_data in self.data.groupby(self.site_col):
-            dest = os.path.join(self.output_folder, site_name,
+            dest = os.path.join(self.output_folder, site_name, 'Graphs',
                                 'Cleaned Scatter.png')
             yearly_scatter(site_data, datetime_col='DateTime',
                            value_col=self.count_col,
@@ -356,7 +356,7 @@ class CountSite:
             calendar_plot(site_data,
                           count_column=(self.count_col, 'sum'),
                           destination_path=os.path.join(
-                              self.output_folder, grp[0],
+                              self.output_folder, grp[0], 'Graphs',
                               '{} {} Calendar Plot.png'.format(
                                   grp[-1] if by_direction else 'Total', save_suffix
                               )
@@ -381,7 +381,7 @@ class CountSite:
         hour_params = dict()
         week_params = dict()
         if by_direction:
-            suffix += ' by direction'
+            suffix += '_By Direction'
             hour_group.append(self.dir_col)
             hour_params['hue'] = self.dir_col
             week_group.append(self.dir_col)
@@ -399,7 +399,7 @@ class CountSite:
 
         for site_name, site_data in hour_data.groupby(self.site_col):
             file_name = os.path.join(
-                self.output_folder, site_name,
+                self.output_folder, site_name, 'Graphs',
                 'Hourly Average by Day{}.png'.format(suffix)
             )
 
@@ -414,7 +414,7 @@ class CountSite:
 
         for site_name, site_data in week_data.groupby(self.site_col):
             file_name = os.path.join(
-                self.output_folder, site_name,
+                self.output_folder, site_name, 'Graphs',
                 'Week Total by Day{}.png'.format(suffix)
             )
             atc_facet_grid(site_data, separate_rows='Day',
