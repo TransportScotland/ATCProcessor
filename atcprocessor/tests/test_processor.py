@@ -10,7 +10,9 @@ from .. import processor
 class TestProcessor:
     @pytest.fixture(autouse=True)
     def setup(self, tmpdir_factory):
-        self.output_folder = tmpdir_factory.mktemp('Outputs')
+        # Wrap output folder as string for compatibility with old Python
+        # versions
+        self.output_folder = str(tmpdir_factory.mktemp('Outputs'))
         self.datadir = os.path.join(os.path.dirname(__file__), 'test files')
 
         self.thresholds = processor.Thresholds(
