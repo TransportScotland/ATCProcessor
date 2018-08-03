@@ -141,41 +141,74 @@ class ATCProcessorGUI(tk.Frame):
 
     def run(self):
         # TODO work out why the GUI suddenly changes size. Is this consistent?
-
         params = {
             param: var.get() for param, (name, var) in self.variables.items()
         }
+
+        try:
+            thresh = processor.Thresholds(
+                path_to_csv=params['path_to_csv'],
+                site_list=params['site_list']
+            )
+        except FileNotFoundError:
+            messagebox.showerror(
+                title='File Missing',
+                message='One of the site list and thresholds files is missing. '
+                        'Please check these inputs'
+            )
+            return
+        except ValueError as v:
+            messagebox.showerror(
+                title='Input Error',
+                message='The following issue has been found with the inputs '
+                        'chosen:\n{}'.format(v)
+            )
 
         self.save_settings(
             use_dialogs=False,
             file_path=os.path.join(params['output_folder'], 'settings.json')
         )
 
-        thresh = processor.Thresholds(
-            path_to_csv=params['path_to_csv'],
-            site_list=params['site_list']
-        )
+        input_files = glob(os.path.join(params['input_folder'], '*.csv'))
+        if input_files:
+            for f in input_files:
+                try:
+                    c = processor.CountSite(
+                        data=f, thresholds=thresh,
+                        output_folder=params['output_folder'],
+                        site_col=params['site_col'],
+                        count_col=params['count_col'],
+                        dir_col=params['dir_col'],
+                        date_col=params['date_col'],
+                        time_col=params['time_col'],
+                        hour_only=params['hour_only']
+                    )
 
-        for f in glob(os.path.join(params['input_folder'], '*.csv')):
-            c = processor.CountSite(data=f, thresholds=thresh,
-                                    output_folder=params['output_folder'],
-                                    site_col=params['site_col'],
-                                    count_col=params['count_col'],
-                                    dir_col=params['dir_col'],
-                                    date_col=params['date_col'],
-                                    time_col=params['time_col'],
-                                    hour_only=params['hour_only'])
+                    c.clean_data(std_range=params['std_range'])
+                    c.summarise_cleaned_data()
+                    c.cleaned_scatter()
+                    c.facet_grids(valid_only=params['valid_only'],
+                                  by_direction=params['by_direction'])
+                    c.produce_cal_plots(valid_only=params['valid_only'],
+                                        by_direction=params['by_direction'])
 
-            c.clean_data(std_range=params['std_range'])
-            c.summarise_cleaned_data()
-            c.cleaned_scatter()
-            c.facet_grids(valid_only=params['valid_only'],
-                          by_direction=params['by_direction'])
-            c.produce_cal_plots(valid_only=params['valid_only'],
-                                by_direction=params['by_direction'])
+                except ValueError as v:
+                    messagebox.showerror(
+                        title='Input Error',
+                        message='The following issue has been found with input '
+                                'file [{}]:\n\n{}\n\nProcessing will terminate '
+                                'here.'.format(f, v)
+                    )
+                    return
 
-        messagebox.showinfo(title='Finished',
-                            message='Processing complete')
+            messagebox.showinfo(title='Finished',
+                                message='Processing complete')
+        else:
+            messagebox.showerror(
+                title='No files found',
+                message='No CSV files could be found in\n{}\nPlease check '
+                        'the folder'.format(params['input_folder'])
+            )
 
 
 class FileInputs(tk.LabelFrame):
