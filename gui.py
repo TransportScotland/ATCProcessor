@@ -40,6 +40,11 @@ class ATCProcessorGUI(tk.Frame):
             'by_direction': ('Output graphs by direction?', tk.BooleanVar()),
             'valid_only': ('Restrict graphs to "Valid" data only?',
                            tk.BooleanVar()),
+            'clean_data': ('Clean data?', tk.BooleanVar()),
+            'outside_std_invalid': (
+                'Mark values outside acceptable standard '
+                'deviation range as invalid?', tk.BooleanVar()
+            ),
         }
 
         # Defaults for advanced settings
@@ -48,6 +53,8 @@ class ATCProcessorGUI(tk.Frame):
         self.variables['by_direction'][1].set(True)
         self.variables['hour_only'][1].set(True)
         self.variables['valid_only'][1].set(True)
+        self.variables['clean_data'][1].set(True)
+        self.variables['outside_std_invalid'][1].set(False)
 
         self.store = dict()
         self.store['File Inputs'] = FileInputs(
@@ -73,9 +80,15 @@ class ATCProcessorGUI(tk.Frame):
 
         self.grid_columnconfigure(0, weight=1)
 
+        self.clean_check = tk.Checkbutton(
+            self, text=self.variables['clean_data'][0],
+            variable=self.variables['clean_data'][1]
+        )
+        self.clean_check.grid(row=2, column=0, columnspan=2)
+
         self.run_button = tk.Button(self, text='Run',
                                     command=lambda: self.run())
-        self.run_button.grid(row=2, column=0, columnspan=2)
+        self.run_button.grid(row=3, column=0, columnspan=2)
 
         # Set up menu bar for advanced settings
         menu_bar = tk.Menu(parent)
@@ -84,7 +97,7 @@ class ATCProcessorGUI(tk.Frame):
 
         menu_bar.add_cascade(label='Options', menu=options)
 
-        # TODO set up advanced settings
+        # Add options to menu bar.
         options.add_command(label='Advanced Settings',
                             command=lambda: self.show_advanced_settings())
         options.add_separator()
@@ -129,11 +142,12 @@ class ATCProcessorGUI(tk.Frame):
                                 message='Settings loaded successfully.')
 
     def show_advanced_settings(self):
-        adv = AdvancedSettings(
+        AdvancedSettings(
             self.parent,
             inputs=(self.variables['combined_datetime'],
                     self.variables['hour_only'],
                     self.variables['std_range'],
+                    self.variables['outside_std_invalid'],
                     self.variables['by_direction'],
                     self.variables['valid_only']),
             title='Advanced Settings'
@@ -141,6 +155,7 @@ class ATCProcessorGUI(tk.Frame):
 
     def run(self):
         # TODO work out why the GUI suddenly changes size. Is this consistent?
+        # TODO implement a progress bar
         params = {
             param: var.get() for param, (name, var) in self.variables.items()
         }
@@ -183,10 +198,12 @@ class ATCProcessorGUI(tk.Frame):
                         time_col=params['time_col'],
                         hour_only=params['hour_only']
                     )
-
-                    c.clean_data(std_range=params['std_range'])
-                    c.summarise_cleaned_data()
-                    c.cleaned_scatter()
+                    if params['clean_data']:
+                        c.clean_data(
+                            std_range=params['std_range'],
+                            outside_std_invalid=params['outside_std_invalid'])
+                        c.summarise_cleaned_data()
+                        c.cleaned_scatter()
                     c.facet_grids(valid_only=params['valid_only'],
                                   by_direction=params['by_direction'])
                     c.produce_cal_plots(valid_only=params['valid_only'],

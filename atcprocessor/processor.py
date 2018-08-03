@@ -157,7 +157,7 @@ class CountSite:
         )
         self.data['Hour'] = self.data['DateTime'].dt.hour
 
-    def clean_data(self, std_range=2):
+    def clean_data(self, std_range=2, outside_std_invalid=False):
         print('Cleaning...')
         if not self.thresholds:
             raise ValueError(
@@ -220,6 +220,11 @@ class CountSite:
              | (self.data[self.count_col] > self.data['StdMax']))
         ).astype(int)
         self.data.drop(['StdMax', 'StdMin'], axis='columns', inplace=True)
+
+        # Allow the user to mark values outside std range as invalid
+        if outside_std_invalid:
+            self.data['Valid'] = self.data['Valid'] & \
+                                 (self.data['StdWarning'] == 0)
 
         # Sort values so they can be written out neatly
         self.data = self.data.sort_values(by=['Date',
@@ -320,6 +325,9 @@ class CountSite:
         print('Calendaring...')
         # Choose data and output folder depending on restricting to valid
         if valid_only:
+            if 'Valid' not in self.data.columns:
+                raise ValueError('Data does not contain a "Valid" column - does'
+                                 ' it need to be cleaned?')
             save_suffix = 'Cleaned'
             plot_data = self.data[self.data['Valid']]
         else:
@@ -359,11 +367,15 @@ class CountSite:
         print('Faceting...')
 
         if valid_only:
+            if 'Valid' not in self.data.columns:
+                raise ValueError('Data does not contain a "Valid" column - does'
+                                 ' it need to be cleaned?')
             plot_data = self.data[self.data['Valid']]
+            suffix = '_Cleaned'
         else:
             plot_data = self.data
+            suffix = '_Uncleaned'
 
-        suffix = ''
         hour_group = [self.site_col, 'Year', 'Day', 'Hour']
         week_group = [self.site_col, 'Year', 'Day', 'WeekNumber']
         hour_params = dict()
