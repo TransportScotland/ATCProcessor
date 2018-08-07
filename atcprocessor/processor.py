@@ -88,17 +88,17 @@ class CountSite:
             os.mkdir(output_folder)
         self.output_folder = output_folder
 
+        if not combined_datetime and not time_col:
+            raise ValueError(
+                'time_col must be specified when combined_datetime=False'
+            )
+
         if type(data) == pd.DataFrame:
             self.data = data
         else:
             if not os.path.isfile(data):
                 raise FileNotFoundError('Data file does not seem to exist.')
             self.data = pd.read_csv(data)
-
-        if not combined_datetime and not time_col:
-            raise ValueError(
-                'time_col must be specified when combined_datetime=False'
-            )
 
         # Check columns are present
         check_cols = [site_col, count_col, dir_col, date_col]
@@ -110,12 +110,6 @@ class CountSite:
             raise ValueError(
                 'The following columns are missing from the input data:\n' +
                 '\n'.join(missing_cols)
-            )
-
-        if site_col not in thresholds.data.columns:
-            raise ValueError(
-                'Site identifying column "{}" must be the same in both ' +
-                'the data file and site list file'.format(site_col)
             )
 
         self.site_col = site_col
@@ -164,6 +158,13 @@ class CountSite:
             raise ValueError(
                 'Thresholds required to clean data'
             )
+
+        if self.site_col not in self.thresholds.data.columns:
+            raise ValueError(
+                'Site identifying column "{}" must be the same in both ' +
+                'the data file and site list file'.format(self.site_col)
+            )
+
         self.data = self.data.groupby([self.site_col, 'DateTime',
                                        'Date', 'Year', 'Month', 'WeekNumber',
                                        'Day', 'Hour',
