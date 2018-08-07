@@ -27,7 +27,7 @@ before_install:
     - sed -i -E 's/(python=)(.*)/\1'$TRAVIS_PYTHON_VERSION'/' ./environment.yml
     - conda env create -n testenv -f environment.yml
     - source activate testenv
-    - python setup.py
+    - python setup.py install
 # Command to install dependencies for tests
 install:
   - pip install codecov
