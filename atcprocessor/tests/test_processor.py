@@ -1,5 +1,6 @@
 import os
 from copy import deepcopy
+from io import StringIO
 
 import pytest
 import pandas as pd
@@ -36,6 +37,20 @@ class TestProcessor:
             **self.cs_param_cols
         )
 
+    def test_threshold_missing_low_high(self):
+        for c in ('Low', 'High'):
+            tmp = StringIO()
+
+            data = pd.read_csv(os.path.join(self.datadir, 'thresholds.csv'))
+            data.drop(c, axis='columns', inplace=True)
+            data.to_csv(tmp, index=False)
+
+            with pytest.raises(ValueError):
+                processor.Thresholds(
+                    path_to_csv=tmp,
+                    site_list=os.path.join(self.datadir, 'site list.csv')
+                )
+
     def test_count_site_missing_file(self):
         with pytest.raises(Exception):
             processor.CountSite(
@@ -63,6 +78,17 @@ class TestProcessor:
                     hour_only=True,
                     **temp_cols
                 )
+
+    def test_clean_no_thresholds(self):
+        p = processor.CountSite(
+            data=os.path.join(self.datadir, 'sites', 'Site 1 Dummy Data.csv'),
+            output_folder=self.output_folder,
+            hour_only=True,
+            **self.cs_param_cols
+        )
+
+        with pytest.raises(ValueError):
+            p.clean_data()
 
     def test_cleaning(self):
         self.count_site.clean_data()
