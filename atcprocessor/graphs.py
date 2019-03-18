@@ -1,5 +1,7 @@
 import os
 
+from matplotlib import use
+use('TKAgg')
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 import matplotlib.dates as mdates
