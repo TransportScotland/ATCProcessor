@@ -3,7 +3,7 @@ import calendar
 from itertools import chain, combinations
 
 import pandas as pd
-import numpy as np
+from numpy import select
 
 from .utilities import make_folder_if_necessary
 from .graphs import yearly_scatter, calendar_plot, atc_facet_grid
@@ -181,8 +181,8 @@ class CountSite:
         high_count = combined_thresh[self.count_col] > combined_thresh['High']
 
         # Add in column to report meeting or failing thresholds
-        self.data['ThreshCheck'] = np.select([low_count, high_count], [-1, 1],
-                                             default=0)
+        self.data['ThreshCheck'] = select([low_count, high_count], [-1, 1],
+                                          default=0)
 
         # Work out instances where day total is 0 - probably a fault
         daily_total = self.data.groupby('Date', as_index=False)\
@@ -255,7 +255,7 @@ class CountSite:
             # Get value counts for all combinations
             all_counts = []
             for grp in summary_options:
-                df = site_data.groupby(by=list(grp))['Valid']\
+                df = site_data.groupby(by=list(grp), observed=True)['Valid']\
                               .value_counts()\
                               .reset_index(name='Freq')\
                               .pivot_table(index=grp, columns='Valid',
@@ -291,7 +291,7 @@ class CountSite:
         too_low = self.data['ThreshCheck'] == -1
         too_high = self.data['ThreshCheck'] == 1
 
-        self.data['Status'] = np.select(
+        self.data['Status'] = select(
             [sd_warn, missing_day, too_low, too_high],
             ['Warning - Outside SD Range',
              'Full day missing',
