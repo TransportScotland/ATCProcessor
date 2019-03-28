@@ -150,6 +150,7 @@ class CountSite:
             self.data['Date'].dt.weekday_name,
             categories=calendar.day_name, ordered=True
         )
+        self.data['IsWeekday'] = (self.data['Date'].dt.weekday < 5).astype(int)
         self.data['Hour'] = self.data['DateTime'].dt.hour
 
     def clean_data(self, std_range=2, outside_std_invalid=False):
@@ -167,7 +168,7 @@ class CountSite:
 
         self.data = self.data.groupby([self.site_col, 'DateTime',
                                        'Date', 'Year', 'Month', 'WeekNumber',
-                                       'Day', 'Hour',
+                                       'IsWeekday','Day', 'Hour',
                                        self.dir_col], as_index=False) \
             .agg({self.count_col: 'sum'})
 
@@ -201,8 +202,8 @@ class CountSite:
         valid_data = self.data[self.data['Valid']]
 
         # Work out the average hourly flow in that direction at the site
-        hourly_avg = valid_data.groupby([self.site_col, 'Hour', 'Day',
-                                         self.dir_col])\
+        hourly_avg = valid_data.groupby([self.site_col, self.dir_col,
+                                         'Year', 'IsWeekday', 'Hour'])\
                                .agg({self.count_col: ['mean', 'std']})
         hourly_avg.columns = hourly_avg.columns.droplevel()
         hourly_avg.reset_index(inplace=True)
