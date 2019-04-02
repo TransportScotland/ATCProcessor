@@ -4,9 +4,16 @@ from itertools import chain, combinations
 
 import pandas as pd
 from numpy import select
+from scipy.stats import shapiro, normaltest
 
 from .utilities import make_folder_if_necessary
 from .graphs import yearly_scatter, calendar_plot, atc_facet_grid
+
+
+def approx_normal(x):
+    if len(x) < 3:
+        return False
+    return any(f(x)[1] > 0.05 for f in (shapiro, normaltest))
 
 
 class SiteList:
@@ -202,9 +209,13 @@ class CountSite:
         valid_data = self.data[self.data['Valid']]
 
         # Work out the average hourly flow in that direction at the site
-        hourly_avg = valid_data.groupby([self.site_col, self.dir_col,
-                                         'Year', 'IsWeekday', 'Hour'])\
-                               .agg({self.count_col: ['mean', 'std']})
+        hourly_avg = (
+            valid_data.groupby([self.site_col, self.dir_col,
+                                'IsWeekday', 'Hour'])
+                      .agg({self.count_col: ['mean', 'std', approx_normal]
+                            })
+                      .rename({'<lambda>': 'norm_dist'}, axis=1, level=1)
+        )
         hourly_avg.columns = hourly_avg.columns.droplevel()
         hourly_avg.reset_index(inplace=True)
 
