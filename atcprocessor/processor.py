@@ -10,10 +10,12 @@ from .utilities import make_folder_if_necessary
 from .graphs import yearly_scatter, calendar_plot, atc_facet_grid
 
 
-def approx_normal(x):
+def approx_normal(x, p_value=0.02):
     if len(x) < 3:
         return False
-    return any(f(x)[1] > 0.05 for f in (shapiro, normaltest))
+    if len(x) < 8:
+        return shapiro(x)[1] > p_value
+    return any(f(x)[1] > p_value for f in (shapiro, normaltest))
 
 
 class SiteList:
@@ -157,10 +159,10 @@ class CountSite:
             self.data['Date'].dt.weekday_name,
             categories=calendar.day_name, ordered=True
         )
-        self.data['IsWeekday'] = (self.data['Date'].dt.weekday < 5).astype(int)
         self.data['Hour'] = self.data['DateTime'].dt.hour
 
-    def clean_data(self, std_range=2, outside_std_invalid=False):
+    def clean_data(self, std_range=2, outside_std_invalid=False,
+                   outside_std_normal_only=False):
         print('Cleaning...')
         if not self.thresholds:
             raise ValueError(
@@ -175,7 +177,7 @@ class CountSite:
 
         self.data = self.data.groupby([self.site_col, 'DateTime',
                                        'Date', 'Year', 'Month', 'WeekNumber',
-                                       'IsWeekday','Day', 'Hour',
+                                       'Day', 'Hour',
                                        self.dir_col], as_index=False) \
             .agg({self.count_col: 'sum'})
 
@@ -211,10 +213,12 @@ class CountSite:
         # Work out the average hourly flow in that direction at the site
         hourly_avg = (
             valid_data.groupby([self.site_col, self.dir_col,
-                                'IsWeekday', 'Hour'])
-                      .agg({self.count_col: ['mean', 'std', approx_normal]
+                                # 'Month', 'IsWeekday', 'Hour'])
+                                'Month', 'Day', 'Hour'])
+                      .agg({self.count_col: ['count', 'mean',
+                                             'std', approx_normal]
                             })
-                      .rename({'<lambda>': 'norm_dist'}, axis=1, level=1)
+                      .rename({'approx_normal': 'ApproxNorm'}, axis=1, level=1)
         )
         hourly_avg.columns = hourly_avg.columns.droplevel()
         hourly_avg.reset_index(inplace=True)
@@ -222,8 +226,6 @@ class CountSite:
         # Upper and lower stdev bounds
         hourly_avg['StdMax'] = hourly_avg['mean'] + hourly_avg['std']*std_range
         hourly_avg['StdMin'] = hourly_avg['mean'] - hourly_avg['std']*std_range
-
-        hourly_avg.drop(['mean', 'std'], axis='columns', inplace=True)
 
         # Bring stdev values into the data frame,
         # flag valid records with stdev warnings
@@ -233,12 +235,20 @@ class CountSite:
             ((self.data[self.count_col] < self.data['StdMin'])
              | (self.data[self.count_col] > self.data['StdMax']))
         ).astype(int)
-        self.data.drop(['StdMax', 'StdMin'], axis='columns', inplace=True)
+        self.data.drop(['StdMax', 'StdMin', 'mean', 'std', 'count'],
+                       axis='columns', inplace=True)
 
         # Allow the user to mark values outside std range as invalid
         if outside_std_invalid:
-            self.data['Valid'] = self.data['Valid'] & \
-                                 (self.data['StdWarning'] == 0)
+            if outside_std_normal_only:
+                self.data['Valid'] = self.data['Valid'] & \
+                                     (self.data['StdWarning'].eq(0) |
+                                      (self.data['ApproxNorm'].eq(False)
+                                       & self.data['StdWarning'].eq(1))
+                                      )
+            else:
+                self.data['Valid'] = self.data['Valid'] & \
+                                     self.data['StdWarning'].eq(0)
 
         # Sort values so they can be written out neatly
         self.data = self.data.sort_values(by=['Date',
@@ -252,6 +262,7 @@ class CountSite:
                                 '{} - Cleaned.csv'.format(site))
             make_folder_if_necessary(dest)
             site_data.to_csv(dest, index=False)
+            hourly_avg.to_csv('_STDEV calcs'.join(os.path.splitext(dest)))
 
     def summarise_cleaned_data(self):
         # Columns to summarise over
@@ -302,21 +313,24 @@ class CountSite:
         missing_day = self.data['MissingDay'] == 1
         too_low = self.data['ThreshCheck'] == -1
         too_high = self.data['ThreshCheck'] == 1
+        invalid_other = self.data['Valid'].eq(False)
 
         self.data['Status'] = select(
-            [sd_warn, missing_day, too_low, too_high],
-            ['Warning - Outside SD Range',
-             'Full day missing',
-             'Below threshold',
-             'Above threshold'],
+            [missing_day, too_low, too_high, invalid_other, sd_warn],
+            ['Full day missing',
+             'Invalid - Below threshold',
+             'Invalid - Above threshold',
+             'Invalid - Other',
+             'Valid - Outside SD Range'],
             default='Valid'
         )
 
         issue_colours = {
-            'Warning - Outside SD Range': 'darkorange',
+            'Valid - Outside SD Range': 'darkorange',
             'Full day missing': 'grey',
-            'Below threshold': 'black',
-            'Above threshold': 'red',
+            'Invalid - Below threshold': 'black',
+            'Invalid - Above threshold': 'red',
+            'Invalid - Other': 'yellow',
             'Valid': 'darkturquoise'
         }
 

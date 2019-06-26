@@ -46,6 +46,10 @@ class ATCProcessorGUI(tk.Frame):
                 'Mark values outside acceptable standard '
                 'deviation range as invalid?', tk.BooleanVar()
             ),
+            'outside_std_norm': (
+                'Only mark outside acceptable standard deviation range as '
+                'invalid if normally distributed?', tk.BooleanVar()
+            ),
         }
 
         # Defaults for advanced settings
@@ -56,6 +60,7 @@ class ATCProcessorGUI(tk.Frame):
         self.variables['valid_only'][1].set(True)
         self.variables['clean_data'][1].set(True)
         self.variables['outside_std_invalid'][1].set(False)
+        self.variables['outside_std_norm'][1].set(False)
 
         self.store = dict()
         self.store['File Inputs'] = FileInputs(
@@ -149,6 +154,7 @@ class ATCProcessorGUI(tk.Frame):
                     self.variables['hour_only'],
                     self.variables['std_range'],
                     self.variables['outside_std_invalid'],
+                    self.variables['outside_std_norm'],
                     self.variables['by_direction'],
                     self.variables['valid_only']),
             title='Advanced Settings'
@@ -202,7 +208,8 @@ class ATCProcessorGUI(tk.Frame):
                     if params['clean_data']:
                         c.clean_data(
                             std_range=params['std_range'],
-                            outside_std_invalid=params['outside_std_invalid'])
+                            outside_std_invalid=params['outside_std_invalid'],
+                            outside_std_normal_only=params['outside_std_norm'])
                         c.summarise_cleaned_data()
                         c.cleaned_scatter()
                     c.facet_grids(valid_only=params['valid_only'],
