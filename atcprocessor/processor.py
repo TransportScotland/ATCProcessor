@@ -3,7 +3,7 @@ import calendar
 from itertools import chain, combinations
 
 import pandas as pd
-from numpy import select
+from numpy import select, where
 from scipy.stats import shapiro, normaltest
 
 from .utilities import make_folder_if_necessary
@@ -175,11 +175,27 @@ class CountSite:
                 'the data file and site list file'.format(self.site_col)
             )
 
-        self.data = self.data.groupby([self.site_col, 'DateTime',
-                                       'Date', 'Year', 'Month', 'WeekNumber',
-                                       'Day', 'Hour',
-                                       self.dir_col], as_index=False) \
-            .agg({self.count_col: 'sum'})
+        # Aggregate across categories, account for weird cases of 'All'
+        # TODO make ClassName column user-selectable
+        self.data['ClassName'] = 'C_' + self.data['ClassName'].astype(str)
+        categories = self.data['ClassName'].unique()
+
+        self.data = self.data.pivot_table(
+            index=[c for c in self.data.columns
+                   if c not in ('ClassName', self.count_col)],
+            columns='ClassName', values=self.count_col
+        ).reset_index()
+
+        self.data.index.name = None
+
+        self.data[self.count_col] = self.data[categories].sum(axis=1)
+
+        if 'C_All' in categories:
+            minus_all = self.data[self.count_col] - self.data['C_All']
+            self.data[self.count_col] = where(
+                minus_all.gt(0), minus_all, self.data[self.count_col]
+            )
+        self.data.drop(categories, axis=1, inplace=True)
 
         # Get the thresholds alongside the relevant counts
         combined_thresh = self.data.merge(
